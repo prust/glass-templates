@@ -23,11 +23,21 @@ function GlassTemplates(templates) {
         if (separator_ix > -1) {
           var nested_obj = obj[key.slice(0, separator_ix)];
           key = key.slice(separator_ix + 1);
+          if (!nested_obj)
+            return '';
         }
 
         if (!(key in templates))
           throw new Error('template "' + key + '" not preloaded');
-        return template(templates[key], nested_obj || obj);
+        
+        if (nested_obj && Array.isArray(nested_obj)) {
+          return nested_obj.map(function(obj) {
+            return template(templates[key], obj);
+          }).join('\n');
+        }
+        else {
+          return template(templates[key], nested_obj || obj);
+        }
       }
 
       var val = obj[key];
