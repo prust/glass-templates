@@ -1,7 +1,6 @@
 (function(root) {
 
-var is_node = typeof require != 'undefined';
-if (is_node)
+if (typeof require != 'undefined')
   module.exports = GlassTemplates;
 else
   root.GlassTemplates = GlassTemplates;
