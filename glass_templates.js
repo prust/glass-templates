@@ -42,6 +42,8 @@ function _template(template, obj, callback) {
     return result;
 }
 
+// TODO: pull out the template-preloader into a separate npm module
+// so glass-templates can be passed the templates
 function preload(path, callback) {
   function cb(err, template) {
     if (err) return callback(err);
