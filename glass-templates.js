@@ -6,18 +6,18 @@ else
   root.GlassTemplates = GlassTemplates;
 
 var regex = /\{\{(\{)?\s*(.+?)\s*\}\}\}?/g;
-var nested_regex = /\{\{(\{)?\s*(.+?)\.html\s*\}\}\}?/gi;
+var nested_regex = /\{\{ (.+?)\.html \}\}?/gi;
 
 function GlassTemplates(templates) {
   if (typeof templates == 'string')
     templates = {'default': templates};
 
   function template(obj, tmpl_name) {
-    var template = templates[tmpl_name || 'default'];
-    if (!template)
+    var tmpl = templates[tmpl_name || 'default'];
+    if (!tmpl)
       throw new Error('Template "' + (tmpl_name || 'default') + '" not found.');
 
-    return template.replace(regex, function(match, third_brace, key) {
+    return tmpl.replace(regex, function(match, third_brace, key) {
       if (nested_regex.test(match)) {
         var separator_ix = key.indexOf(' ');
         if (separator_ix > -1) {
@@ -32,15 +32,24 @@ function GlassTemplates(templates) {
         
         if (nested_obj && Array.isArray(nested_obj)) {
           return nested_obj.map(function(obj) {
-            return template(templates[key], obj);
+            return template(obj, key);
           }).join('\n');
         }
         else {
-          return template(templates[key], nested_obj || obj);
+          return template(nested_obj || obj, key);
         }
       }
 
-      var val = obj[key];
+      var val;
+      var deep_obj = obj;
+      var key_parts = key.split('.');
+      key_parts.forEach(function(key, i) {
+        if (deep_obj)
+          deep_obj = deep_obj[key];
+        if (i == key_parts.length - 1)
+          val = deep_obj;
+      });
+      
       if (val == null)
         return '';
 
