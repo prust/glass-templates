@@ -41,14 +41,19 @@ function GlassTemplates(templates) {
       }
 
       var val;
-      var deep_obj = obj;
-      var key_parts = key.split('.');
-      key_parts.forEach(function(key, i) {
-        if (deep_obj)
-          deep_obj = deep_obj[key];
-        if (i == key_parts.length - 1)
-          val = deep_obj;
-      });
+      if (key == '.') {
+        val = obj;
+      }
+      else {
+        var deep_obj = obj;
+        var key_parts = key.split('.');
+        key_parts.forEach(function(key, i) {
+          if (deep_obj)
+            deep_obj = deep_obj[key];
+          if (i == key_parts.length - 1)
+            val = deep_obj;
+        });
+      }
       
       if (val == null)
         return '';
