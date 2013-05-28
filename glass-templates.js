@@ -21,22 +21,26 @@ function GlassTemplates(templates) {
       if (nested_regex.test(match)) {
         var separator_ix = key.indexOf(' ');
         if (separator_ix > -1) {
-          var nested_obj = obj[key.slice(0, separator_ix)];
-          key = key.slice(separator_ix + 1);
+          var nested_tmpl = key.slice(separator_ix + 1);
+          key = key.slice(0, separator_ix)
+          var nested_obj = key == '.' ? obj : obj[key];
           if (!nested_obj)
             return '';
         }
+        else {
+          var nested_tmpl = key;
+        }
 
-        if (!(key in templates))
-          throw new Error('template "' + key + '" not preloaded');
+        if (!(nested_tmpl in templates))
+          throw new Error('template "' + nested_tmpl + '" not preloaded');
         
         if (nested_obj && Array.isArray(nested_obj)) {
           return nested_obj.map(function(obj) {
-            return template(obj, key);
+            return template(obj, nested_tmpl);
           }).join('\n');
         }
         else {
-          return template(nested_obj || obj, key);
+          return template(nested_obj || obj, nested_tmpl);
         }
       }
 
