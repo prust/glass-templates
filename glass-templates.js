@@ -1,76 +1,81 @@
 (function(root) {
 
 if (typeof require != 'undefined')
-  module.exports = GlassTemplates;
+  module.exports = template;
 else
-  root.GlassTemplates = GlassTemplates;
+  root.glassTemplate = template;
 
 var regex = /\{\{(\{)?\s*(.+?)\s*\}\}\}?/g;
 var nested_regex = /\{\{ (.+?)\.html \}\}?/gi;
+var templates = {};
 
-function GlassTemplates(templates) {
-  if (typeof templates == 'string')
-    templates = {'default': templates};
+function template(tmpl_path, obj, callback) {
+  if (templates[tmpl_path])
+    return callback(null, _template(tmpl_path, obj));
 
-  function template(obj, tmpl_name) {
-    var tmpl = templates[tmpl_name || 'default'];
-    if (!tmpl)
-      throw new Error('Template "' + (tmpl_name || 'default') + '" not found.');
+  if (!(tmpl_path in templates))
+    loadTemplates(tmpl_path);
 
-    return tmpl.replace(regex, function(match, third_brace, key) {
-      if (nested_regex.test(match)) {
-        var separator_ix = key.indexOf(' ');
-        if (separator_ix > -1) {
-          var nested_tmpl = key.slice(separator_ix + 1);
-          key = key.slice(0, separator_ix)
-          var nested_obj = key == '.' ? obj : obj[key];
-          if (!nested_obj)
-            return '';
-        }
-        else {
-          var nested_tmpl = key;
-        }
-
-        if (!(nested_tmpl in templates))
-          throw new Error('template "' + nested_tmpl + '" not preloaded');
-        
-        if (nested_obj && Array.isArray(nested_obj)) {
-          return nested_obj.map(function(obj) {
-            return template(obj, nested_tmpl);
-          }).join('\n');
-        }
-        else {
-          return template(nested_obj || obj, nested_tmpl);
-        }
-      }
-
-      var val;
-      if (key == '.') {
-        val = obj;
-      }
-      else {
-        var deep_obj = obj;
-        var key_parts = key.split('.');
-        key_parts.forEach(function(key, i) {
-          if (deep_obj)
-            deep_obj = deep_obj[key];
-          if (i == key_parts.length - 1)
-            val = deep_obj;
-        });
-      }
-      
-      if (val == null)
-        return '';
-
-      return third_brace ? val : escape(val);
-    });
-  }
-
-  return {'template': template};
+  onTemplatesLoaded(function() {
+    callback(null, _template(tmpl_path, obj));
+  });
 }
 
-GlassTemplates.template = function(templ, obj) {
-  return GlassTemplates(templ).template(obj);
+var path_root;
+template.setRoot = function(new_root) { path_root = new_root; };
+
+function _template(tmpl_path, obj) {
+  var tmpl = templates[tmpl_path];
+  if (!tmpl)
+    throw new Error('Template "' + tmpl_path + '" not preloaded.');
+
+  return tmpl.replace(regex, function(match, third_brace, key) {
+    if (nested_regex.test(match)) {
+      var separator_ix = key.indexOf(' ');
+      if (separator_ix > -1) {
+        var nested_tmpl = key.slice(separator_ix + 1);
+        key = key.slice(0, separator_ix)
+        var nested_obj = key == '.' ? obj : obj[key];
+        if (!nested_obj)
+          return '';
+      }
+      else {
+        var nested_tmpl = key;
+      }
+
+      if (!(nested_tmpl in templates))
+        throw new Error('template "' + nested_tmpl + '" not preloaded');
+      
+      if (nested_obj && Array.isArray(nested_obj)) {
+        return nested_obj.map(function(obj) {
+          return _template(nested_tmpl, obj);
+        }).join('\n');
+      }
+      else {
+        return _template(nested_tmpl, nested_obj || obj);
+      }
+    }
+
+    var val;
+    if (key == '.') {
+      val = obj;
+    }
+    else {
+      var deep_obj = obj;
+      var key_parts = key.split('.');
+      key_parts.forEach(function(key, i) {
+        if (deep_obj)
+          deep_obj = deep_obj[key];
+        if (i == key_parts.length - 1)
+          val = deep_obj;
+      });
+    }
+    
+    if (val == null)
+      return '';
+
+    return third_brace ? val : escape(val);
+  });
 }
 
 // from _.template()
@@ -82,11 +87,63 @@ var charCodes = {
   "'": '&#x27;',
   '/': '&#x2F;'
 };
-
 function escape(str) {
   return str.replace(/[&<>"'\/]/g, function(s) {
     return charCodes[s];
   });
+}
+
+function loadTemplates(path) {
+  templates[path] = null;
+  var full_path = path_root ? (path_root + '/' + path) : path;
+
+  if (typeof require != 'undefined')
+    require('fs').readFile(full_path, 'utf-8', cb);
+  else if (root.$)
+    $.ajax(ajaxSettings({'url': full_path}, cb));
+  else
+    throw new Error('When running in the browser, jQuery/Zepto is necessary to pull in templates via ajax');
+
+  function cb(err, template) {
+    if (err) throw err;
+
+    templates[path] = template;
+
+    var nested_templates = template.match(nested_regex) || [];
+    nested_templates.forEach(function(path) {
+      path = path.replace('{{ ', '').replace(' }}', '');
+      var separator_ix = path.indexOf(' ');
+      if (separator_ix > -1)
+        path = path.slice(separator_ix + 1);
+      if (!(path in templates))
+        loadTemplates(path);
+    });
+
+    // if all are loaded, call the loaded_handlers
+    for (var tmpl_path in templates)
+      if (!templates[tmpl_path])
+        return;
+
+    loaded_handlers.forEach(function(handler) {
+      handler();
+    });
+    loaded_handlers = [];
+  }
+}
+
+var loaded_handlers = [];
+function onTemplatesLoaded(handler) {
+  loaded_handlers.push(handler);
+}
+
+function ajaxSettings(opts, callback) {
+  opts.success = function(data) {
+    callback(null, data);
+  };
+  opts.error = function(jqXHR, textStatus, errorThrown) {
+    callback(errorThrown || jqXHR.status || textStatus);
+  };
+  return opts;
 }
 
 })(this);
