@@ -6,7 +6,6 @@ else
   root.glassTemplate = template;
 
 var regex = /\{\{(\{)?\s*(.+?)\s*\}\}\}?/g;
-var nested_regex = /\{\{ (.+?)\.html \}\}?/gi;
 var templates = {};
 
 function template(tmpl_path, obj, callback) {
@@ -30,21 +29,13 @@ function _template(tmpl_path, obj) {
     throw new Error('Template "' + tmpl_path + '" not preloaded.');
 
   return tmpl.replace(regex, function(match, third_brace, key) {
-    if (nested_regex.test(match)) {
-      var separator_ix = key.indexOf(' ');
-      if (separator_ix > -1) {
-        var nested_tmpl = key.slice(separator_ix + 1);
-        key = key.slice(0, separator_ix)
-        var nested_obj = key == '.' ? obj : obj[key];
-        if (!nested_obj)
-          return '';
-      }
-      else {
-        var nested_tmpl = key;
-      }
-
-      if (!(nested_tmpl in templates))
-        throw new Error('template "' + nested_tmpl + '" not preloaded');
+    var separator_ix = key.indexOf(' ');
+    if (separator_ix > -1) {
+      var nested_tmpl = key.slice(separator_ix + 1);
+      key = key.slice(0, separator_ix)
+      var nested_obj = key == '.' ? obj : obj[key];
+      if (!nested_obj)
+        return '';
       
       if (nested_obj && Array.isArray(nested_obj)) {
         return nested_obj.map(function(obj) {
@@ -109,15 +100,17 @@ function loadTemplates(path) {
 
     templates[path] = template;
 
-    var nested_templates = template.match(nested_regex) || [];
-    nested_templates.forEach(function(path) {
-      path = path.replace('{{ ', '').replace(' }}', '');
-      var separator_ix = path.indexOf(' ');
-      if (separator_ix > -1)
-        path = path.slice(separator_ix + 1);
-      if (!(path in templates))
-        loadTemplates(path);
-    });
+    var match;
+    while (match = regex.exec(template)) {
+      var key = match[2];
+      var separator_ix = key.indexOf(' ');
+      if (separator_ix == -1)
+        continue;
+
+      var nested_path = key.slice(separator_ix + 1);
+      if (!(nested_path in templates))
+        loadTemplates(nested_path);
+    }
 
     // if all are loaded, call the loaded_handlers
     for (var tmpl_path in templates)
