@@ -5,11 +5,14 @@ if (typeof require != 'undefined')
 else
   root.glassTemplate = template;
 
+var _ = root._ || require('underscore');
+
 var regex = /\{\{(\{)?\s*(.+?)\s*\}\}\}?/g;
 var templates = {};
+var children = {};
 
 function template(tmpl_path, obj, callback) {
-  if (templates[tmpl_path])
+  if (isLoaded(tmpl_path))
     return callback(null, _template(tmpl_path, obj));
 
   if (!(tmpl_path in templates))
@@ -22,6 +25,10 @@ function template(tmpl_path, obj, callback) {
 
 var path_root;
 template.setRoot = function(new_root) { path_root = new_root; };
+
+function isLoaded(path) {
+  return templates[path] && _.all(children[path], isLoaded);
+}
 
 function _template(tmpl_path, obj) {
   var tmpl = templates[tmpl_path];
@@ -99,6 +106,7 @@ function loadTemplates(path) {
     if (err) throw err;
 
     templates[path] = template;
+    children[path] = [];
 
     var match;
     while (match = regex.exec(template)) {
@@ -108,6 +116,7 @@ function loadTemplates(path) {
         continue;
 
       var nested_path = key.slice(separator_ix + 1);
+      children[path].push(nested_path);
       if (!(nested_path in templates))
         loadTemplates(nested_path);
     }
