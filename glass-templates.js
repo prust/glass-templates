@@ -72,7 +72,7 @@ function _template(tmpl_path, obj) {
     if (val == null)
       return '';
 
-    return third_brace ? val : escape(val);
+    return (third_brace || typeof val == 'number') ? val : escape(val);
   });
 }
 
