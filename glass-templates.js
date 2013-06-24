@@ -126,10 +126,13 @@ function loadTemplates(path) {
       if (!templates[tmpl_path])
         return;
 
-    loaded_handlers.forEach(function(handler) {
+    // clear list of queued handlers *before* calling handler fns
+    // b/c sometimes the handler fns queue more handlers
+    var handlers = loaded_handlers.slice();
+    loaded_handlers = [];
+    handlers.forEach(function(handler) {
       handler();
     });
-    loaded_handlers = [];
   }
 }
 

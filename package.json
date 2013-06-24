@@ -1,6 +1,6 @@
 {
   "name": "glass-templates",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "devDependencies": {
     "mocha": "1.10.x"
   }
