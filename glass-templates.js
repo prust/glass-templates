@@ -72,6 +72,9 @@ function _template(tmpl_path, obj) {
     if (val == null)
       return '';
 
+    if (typeof str != "string")
+      val = val.toString();
+
     return (third_brace || typeof val == 'number') ? val : escape(val);
   });
 }
