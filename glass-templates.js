@@ -7,19 +7,24 @@ else
 
 var _ = root._ || require('underscore');
 
-var regex = /\{\{(\{)?\s*(.+?)\s*\}\}\}?/g;
+var triple_brace = /\{\{\{\s*(.+?)\s*\}\}\}/g;
+var double_brace = /\{\{\s*(.+?)\s*\}\}/g;
 var templates = {};
 var children = {};
 
 function template(tmpl_path, obj, callback) {
-  if (isLoaded(tmpl_path))
-    return callback(null, _template(tmpl_path, obj));
+  if (isLoaded(tmpl_path)) {
+    return callback(null, _template(templates[tmpl_path], obj));
+  }
 
   if (!(tmpl_path in templates))
     loadTemplates(tmpl_path);
 
   onTemplatesLoaded(function() {
-    callback(null, _template(tmpl_path, obj));
+    var tmpl = templates[tmpl_path];
+    if (!tmpl)
+      throw new Error('Template "' + tmpl_path + '" not loaded.');
+    callback(null, _template(tmpl, obj));
   });
 }
 
@@ -30,50 +35,58 @@ function isLoaded(path) {
   return templates[path] && _.all(children[path], isLoaded);
 }
 
-function _template(tmpl_path, obj) {
-  var tmpl = templates[tmpl_path];
-  if (!tmpl)
-    throw new Error('Template "' + tmpl_path + '" not preloaded.');
-
-  return tmpl.replace(regex, function(match, third_brace, key) {
+function _template(tmpl, obj) {
+  var html = tmpl.replace(triple_brace, function(match, key) {
     var separator_ix = key.indexOf(' ');
-    if (separator_ix > -1) {
-      var nested_tmpl = key.slice(separator_ix + 1);
-      key = key.slice(0, separator_ix)
-      var nested_obj = key == '.' ? obj : obj[key];
-      if (!nested_obj)
-        return '';
-      
-      if (nested_obj && Array.isArray(nested_obj)) {
-        return nested_obj.map(function(obj) {
-          return _template(nested_tmpl, obj);
-        }).join('\n');
-      }
-      else {
-        return _template(nested_tmpl, nested_obj || obj);
-      }
+    if (separator_ix == -1)
+      return getValue(key, obj);
+
+    var nested_tmpl = key.slice(separator_ix + 1);
+    key = key.slice(0, separator_ix)
+
+    var val = getValue(key, obj);
+    if (!val)
+      return '';
+    
+    if (nested_tmpl.slice(-5) == '.html') {
+      if (!templates[nested_tmpl])
+        throw new Error('Template "' + nested_tmpl + '" not loaded.');
+      nested_tmpl = templates[nested_tmpl];
     }
 
-    var val;
-    if (key == '.') {
-      val = obj;
+    if (_.isArray(val)) {
+      return val.map(function(obj) {
+        return _template(nested_tmpl, obj);
+      }).join('');
     }
     else {
-      var deep_obj = obj;
-      var key_parts = key.split('.');
-      key_parts.forEach(function(key, i) {
-        if (deep_obj)
-          deep_obj = deep_obj[key];
-        if (i == key_parts.length - 1)
-          val = deep_obj;
-      });
+      return _template(nested_tmpl, val);
     }
-    
-    if (val == null)
-      return '';
-
-    return (third_brace || typeof val == 'number') ? val : escape(val);
   });
+
+  // 2nd pass: double braces
+  return html.replace(double_brace, function(match, key) {
+    var val = getValue(key, obj);
+    switch (typeof val) {
+      case "string": return escape(val);
+      case "number": return val;
+      default: throw new Error('Unsupported type: ' + typeof val);
+    }
+  });
+}
+
+function getValue(key, ctx) {
+  if (key != '.') {  
+    key = key + '.';
+    while (key.length) {
+      var dot_ix = key.indexOf('.');
+      ctx = ctx[key.slice(0, dot_ix)]
+      key = key.slice(dot_ix + 1);
+      if (ctx == null)
+        return '';
+    }
+  }
+  return ctx;
 }
 
 // from _.template()
@@ -109,16 +122,18 @@ function loadTemplates(path) {
     children[path] = [];
 
     var match;
-    while (match = regex.exec(template)) {
-      var key = match[2];
+    while (match = triple_brace.exec(template)) {
+      var key = match[1];
       var separator_ix = key.indexOf(' ');
       if (separator_ix == -1)
         continue;
 
       var nested_path = key.slice(separator_ix + 1);
-      children[path].push(nested_path);
-      if (!(nested_path in templates))
-        loadTemplates(nested_path);
+      if (nested_path.slice(-5) == '.html') {
+        children[path].push(nested_path);
+        if (!(nested_path in templates))
+          loadTemplates(nested_path);
+      }
     }
 
     // if all are loaded, call the loaded_handlers
