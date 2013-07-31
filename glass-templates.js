@@ -68,8 +68,9 @@ function _template(tmpl, obj) {
   return html.replace(double_brace, function(match, key) {
     var val = getValue(key, obj);
     switch (typeof val) {
-      case "string": return escape(val);
-      case "number": return val;
+      case 'string': return escape(val);
+      case 'number': return val;
+      case 'boolean': return val ? 'true' : 'false';
       default: throw new Error('Unsupported type: ' + typeof val);
     }
   });
