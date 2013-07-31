@@ -18,4 +18,11 @@ describe('glassTemplates', function() {
       });
     });
   });
+
+  it('should support inline nested templates', function(done) {
+    template('inline_nested.html', {'teams': ['Mariners', 'Red Sox']}, function(err, html) {
+      assert.equal(html, "<ul><li>Mariners</li><li>Red Sox</li></ul>")
+      done();
+    });
+  });
 });
