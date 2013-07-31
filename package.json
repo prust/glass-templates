@@ -6,5 +6,6 @@
   },
   "devDependencies": {
     "mocha": "1.10.x"
-  }
+  },
+  "main" : "glass-templates.js"
 }
